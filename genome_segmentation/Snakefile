@@ -1,0 +1,61 @@
+configfile: "config.yaml"
+
+N_ESTIMATORS = 48
+REG_WEIGHT = 0.1
+
+rule extract_training_sequences:
+    input:
+        peaks="input/{exp}_peaks.bed",
+        genome=config["genome_input"]
+    params:
+        selected_chrom=" ".join(config["input_chromosomes"])
+    output:
+        tmnt_bed="data/training_sequences/{exp}/tmnt.bed",
+        tmnt_fa="data/training_sequences/{exp}/tmnt.fa",
+        ctrl_bed="data/training_sequences/{exp}/ctrl.bed",
+        ctrl_fa="data/training_sequences/{exp}/ctrl.fa"
+    threads:
+        1
+    shell:
+        "scripts/prepare_training_data --peaks-fl {input.peaks} --genome-fl {input.genome} --output-tmnt-bed {output.tmnt_bed} --output-tmnt-fasta {output.tmnt_fa} --output-ctrl-bed {output.ctrl_bed} --output-ctrl-fasta {output.ctrl_fa} --selected-chromosomes {params.selected_chrom} --window-size 501"
+
+rule extract_target_sequences:
+    input:
+        peaks="input/{exp}_peaks.bed",
+        genome=config["genome_target"]
+    params:
+        selected_chrom=lambda w: "--selected-chromosomes " + " ".join(config["target_chromosomes"]) if len(config["target_chromosomes"]) > 0 else ""
+    output:
+        tmnt_bed="data/target_sequences/{exp}/tmnt.bed",
+        tmnt_fa="data/target_sequences/{exp}/tmnt.fa",
+        ctrl_bed="data/target_sequences/{exp}/ctrl.bed",
+        ctrl_fa="data/target_sequences/{exp}/ctrl.fa"
+    threads:
+        1
+    shell:
+        "scripts/prepare_training_data --peaks-fl {input.peaks} --genome-fl {input.genome} --output-tmnt-bed {output.tmnt_bed} --output-tmnt-fasta {output.tmnt_fa} --output-ctrl-bed {output.ctrl_bed} --output-ctrl-fasta {output.ctrl_fa} {params.selected_chrom} --window-size 501"
+
+        
+rule run_models:
+    input:
+        target_tmnt_fa="data/target_sequences/{target_exp}/tmnt.fa",
+        target_ctrl_fa="data/target_sequences/{target_exp}/ctrl.fa",
+        training_tmnt_fa="data/training_sequences/{training_exp}/tmnt.fa",
+        training_ctrl_fa="data/training_sequences/{training_exp}/ctrl.fa"
+    params:
+        reg_weight=REG_WEIGHT,
+        n_estimators=N_ESTIMATORS
+    output:
+        fa="data/model_predictions/{training_exp}-{target_exp}/target_predictions.bed"
+    threads:
+        4
+    shell:
+        "scripts/classify_peaks --training-tmnt-fasta {input.training_tmnt_fa} --training-ctrl-fasta {input.training_ctrl_fa} --target-tmnt-fasta {input.target_tmnt_fa} --target-ctrl-fasta {input.target_ctrl_fa} --reg-weight {params.reg_weight} --n-jobs {threads} --n-estimators {params.n_estimators} --output-bed-fl {output.fa} &> data/model_predictions/{wildcards.training_exp}-{wildcards.target_exp}/target_predictions.log"
+
+rule run_experiments:
+    input:
+        pred_regions=expand("data/model_predictions/{training_exp}-{target_exp}/target_predictions.bed",
+                            training_exp=config["source_peaks"],
+                            target_exp=config["target_peaks"])
+
+

@@ -1,0 +1,6 @@
+source_peaks: ["UMI", "STARR"]
+target_peaks: ["AGAP_STARR"]
+genome_input: "input/dmel-all-chromosome-r6.45.fasta"
+input_chromosomes: ["2L", "2R", "3L", "3R", "X"]
+genome_target: "input/Anopheles-gambiae-PEST_CHROMOSOMES_AgamP4.fa"
+target_chromosomes: ["2L", "2R", "3L", "3R", "X"]
