@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+
+import argparse
+import glob
+import sys
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--result-npzs",
+                        type=str,
+                        nargs="+",
+                        help="Npz files from training and evaluating models")
+
+    parser.add_argument("--experiment-names",
+                        type=str,
+                        nargs="+",
+                        help="Provide names for plot labels [must match length of result-npzs]")
+
+    parser.add_argument("--plot-fl",
+                        type=str,
+                        required=True,
+                        help="Filename for resulting ROC curve")
+    
+    args = parser.parse_args()
+
+    if len(args.experiment_names) != len(args.result_npzs):
+        print("You must provide the same number of experiment names as result npz files")
+        sys.exit(1)
+
+    fig = plt.gcf()
+    fig.set_dpi(300)
+    for flname, name in zip(args.result_npzs, args.experiment_names):
+        results = np.load(flname)
+        fpr, tpr, _ = roc_curve(results["y_true"], results["pred_prob"])
+        auc = roc_auc_score(results["y_true"], results["pred_prob"])
+        label = "{} ({:.1%})".format(name, auc)
+        plt.plot(100 * fpr, 100 * tpr, label=label)
+
+    plt.plot([0, 100], [0, 100], linestyle="--", color="k")
+    plt.xlabel("False Positive Rate (%)", fontsize=18)
+    plt.ylabel("True Positive Rate (%)", fontsize=18)
+    plt.xticks(fontsize=14)
+    plt.yticks(fontsize=14)
+    plt.legend(fontsize=12)
+    plt.tight_layout()
+    plt.savefig(args.plot_fl)
+
+
+
+if __name__ == "__main__":
+    main()
