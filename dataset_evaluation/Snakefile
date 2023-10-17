@@ -1,8 +1,8 @@
 # these two have to be in the same order
-peaks = ["ATAC", "DNase", "FAIRE", "H3K4me1", "H3K4me3", "H3K27ac", "STARR", "UMI-STARR"]
+peaks = ["tad"]
 
 # determines used in the ROC curve plot
-experiment_names = ["ATAC", "DNase", "FAIRE", "H3K4me1", "H3K4me3", "H3K27ac", "STARR", "UMI-STARR"]
+experiment_names = ["tad"]
 
 N_ESTIMATORS = 48
 REG_WEIGHT = 0.1
@@ -11,10 +11,18 @@ REG_WEIGHT = 0.1
 # so we won't use them
 CHROMOSOMES = ["2L", "2R", "3L", "3R", "X"]
 
+rule all:
+    input:
+        tmnt_bed=expand("data/sequences/{exp}/tmnt.bed", exp=experiment_names),
+        tmnt_fa=expand("data/sequences/{exp}/tmnt.fa", exp=experiment_names),
+        ctrl_bed=expand("data/sequences/{exp}/ctrl.bed", exp=experiment_names),
+        ctrl_fa=expand("data/sequences/{exp}/ctrl.fa", exp=experiment_names)
+
 rule extract_sequences:
     input:
-        peaks="input/{exp}_peaks.bed",
-        genome="input/genome.fa"
+        peaks="input/tad_classification.bed",
+        genome="input/dmel-all-chromosome-r6.54.fasta",
+        bed_genome="input/bed.genome"
     params:
         selected_chrom=" ".join(CHROMOSOMES)
     output:
@@ -25,7 +33,7 @@ rule extract_sequences:
     threads:
         1
     shell:
-        "scripts/sample_controls --peaks-fl {input.peaks} --genome-fl {input.genome} --output-tmnt-bed {output.tmnt_bed} --output-tmnt-fasta {output.tmnt_fa} --output-ctrl-bed {output.ctrl_bed} --output-ctrl-fasta {output.ctrl_fa} --selected-chromosomes {params.selected_chrom} --window-size 501"
+        "scripts/modified_sample_controls --peaks-fl {input.peaks} --genome-fl {input.genome} --output-tmnt-bed {output.tmnt_bed} --output-tmnt-fasta {output.tmnt_fa} --output-ctrl-bed {output.ctrl_bed} --output-ctrl-fasta {output.ctrl_fa} --selected-chromosomes {params.selected_chrom} --window-size 501 --bed-genome-fl {input.bed_genome}"
 
 rule evaluate_models:
     input:

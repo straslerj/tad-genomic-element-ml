@@ -2,6 +2,7 @@
 
 import argparse
 import random
+import subprocess
 import sys
 
 import intervaltree
@@ -9,25 +10,50 @@ import pandas as pd
 
 
 def read_narrowpeak(flname):
-    try:
-        df = pd.read_csv(
-            flname,
-            delim_whitespace=True,
-            header=None,
-            usecols=[0, 1, 2, 9],
-            names=["chromosome", "start", "end", "summit_offset"],
-        )
-    except:
-        df = pd.read_csv(
-            flname,
-            delim_whitespace=True,
-            header=None,
-            usecols=[0, 1, 2],
-            names=["chromosome", "start", "end"],
-        )
-        df["summit_offset"] = 0
+    df = pd.read_csv(
+        flname,
+        delim_whitespace=True,
+        header=None,
+        usecols=[0, 1, 2],
+        names=["chromosome", "start", "end"],
+    )
 
     return df
+
+
+def get_chromosome_sizes(genome_fl):
+    cmd = ["bedtools", "genomecov", "-ibam", genome_fl, "-g", genome_fl]
+    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
+
+
+def shuffle_bed(bed_file, genome_fl):
+    shuffled_bed_file = bed_file.replace(".bed", ".shuffled.bed")
+    cmd = [
+        "bedtools",
+        "shuffle",
+        "-i",
+        bed_file,
+        "-g",
+        genome_fl,
+        "-chrom",
+    ]
+    with open(shuffled_bed_file, "w") as f:
+        subprocess.run(cmd, check=True, stdout=f, stderr=subprocess.PIPE)
+    return shuffled_bed_file
+
+
+def get_fasta_from_bed(shuffled_bed_file, genome_fl, fasta_output, bedtools_path):
+    cmd = [
+        bedtools_path,
+        "getfasta",
+        "-fi",
+        genome_fl,
+        "-bed",
+        shuffled_bed_file,
+        "-fo",
+        fasta_output,
+    ]
+    subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
 
 
 def read_fasta(flname):
@@ -110,7 +136,7 @@ def extract_sequences(genome_seqs, peak_df):
     for idx, row in peak_df.iterrows():
         chrom = row.chromosome
         seq = genome_seqs[chrom][row.start : row.end + 1]
-        name = "{}:{}-{}".format(chrom, row.start, row.end)
+        name = "{}_{}_{}".format(chrom, row.start, row.end)
         sequences[name] = seq
 
     return sequences
@@ -124,6 +150,52 @@ def write_fasta(flname, seqs):
             fl.write("\n")
             fl.write(seq)
             fl.write("\n")
+
+
+# def shuffle_bed(input_bed, genome_fasta):
+#     """
+#     Uses bedtools shuffle command.
+
+#     Parameters:
+#         -chrom      : shuffling happens per chromosome
+#         -i          : input file will be shuffled
+#         input_bed   : path to input BED file
+#         -g          : specify genome FASTA for info about chromosome sizes
+#         genome_fasta: path to genome FASTA
+#         -seed       : sets random seed
+#     """
+#     shuffled = "shuffled.bed"
+#     cmd = [
+#         "bedtools",
+#         "shuffle",
+#         "-chrom",
+#         "-i",
+#         input_bed,
+#         "-g",
+#         genome_fasta,
+#         "-seed",
+#         "1",
+#     ]
+#     subprocess.run(cmd, stdout=open(shuffled, "w"))
+#     return shuffled
+
+
+def get_fasta_length(genome_fasta):
+    """
+    Uses bedtools to get length of the FASTA file.
+
+    Parameters:
+        nucleotide_content: gets composition of sequence
+        -fi               : FASTA input
+    """
+    cmd = ["bedtools", "nucleotide_content", "-fi", genome_fasta]
+    result = subprocess.run(cmd, stdout=subprocess.PIPE, text=True)
+    fasta_lengths = {}
+    for line in result.stdout.split("\n"):
+        if line:
+            parts = line.split("\t")
+            fasta_lengths[parts[0]] = int(parts[1])
+    return fasta_lengths
 
 
 def main():
@@ -168,37 +240,67 @@ def main():
 
     parser.add_argument("--selected-chromosomes", nargs="+")
 
+    parser.add_argument(
+        "--bed-genome-fl",
+        required=True,
+        type=str,
+        help="Needed for the bedtools shuffle call",
+    )
+
     args = parser.parse_args()
+
+    with open(args.peaks_fl, "r") as bed_file, open(
+        args.bed_genome_fl, "w"
+    ) as genome_file:
+        for line in bed_file:
+            fields = line.strip().split("\t")
+            if len(fields) < 9:
+                continue
+
+            chromosome = fields[0]
+            start = int(fields[1])
+            end = int(fields[2])
+
+            # Map the chromosome name
+            # chromosome = chromosome_mapping.get(chromosome, chromosome)
+
+            # Write the information to the genome file
+            genome_file.write(f"{chromosome}\t{end - start}\n")
+
+    print(f"FASTA length: {get_fasta_length(args.genome_fl)}")
 
     is_window_even = args.window_size % 2 == 0
     if is_window_even:
         print("Window size must be odd.")
         sys.exit(1)
 
+    # New functionality JS vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    print(args.peaks_fl, args.genome_fl)
+    print("Shuffling bed file...")
+    shuffled = shuffle_bed(args.peaks_fl, args.bed_genome_fl)  # shuffles BED file
+    print("Shuffled bed file complete.")
+    lengths = get_fasta_length(
+        args.genome_fl
+    )  # gets lengths of sequences in the FASTA file
+    args.peaks_fl = shuffled  # use shuffled BED
+    # args.peak_fl = "input/tad_classification.shuffled.bed"
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
     peak_df = read_narrowpeak(args.peaks_fl)
 
-    # select desired chromosomes
     if args.selected_chromosomes:
         query = " or ".join(
             map(lambda s: "chromosome == '{}'".format(s), args.selected_chromosomes)
         )
         print(query)
-
-        # use copy() to avoid warnings about setting on copies
         peak_df = peak_df.query(query).copy()
 
-    # extract windows centered on peak summits
-    peak_df["summit_pos"] = peak_df["start"] + peak_df["summit_offset"]
-    peak_df["start"] = peak_df["summit_pos"] - args.window_size // 2
-    peak_df["end"] = peak_df["summit_pos"] + args.window_size // 2
-
     genome_seq = read_fasta(args.genome_fl)
-    if args.selected_chromosomes:
-        genome_seq = {
-            name: seq
-            for name, seq in genome_seq.items()
-            if name in args.selected_chromosomes
-        }
+    genome_seq = {
+        name: seq
+        for name, seq in genome_seq.items()
+        if len(args.selected_chromosomes) == 0 or name in args.selected_chromosomes
+    }
     chrom_sizes = {name: len(seq) for name, seq in genome_seq.items()}
 
     control_df = sample_control_windows(peak_df, args.window_size, chrom_sizes)
@@ -209,9 +311,34 @@ def main():
 
     control_df.to_csv(args.output_ctrl_bed, header=None, index=False, sep="\t")
 
-    peak_df[["chromosome", "start", "end"]].to_csv(
-        args.output_tmnt_bed, header=None, index=False, sep="\t"
-    )
+    peak_df.to_csv(args.output_tmnt_bed, header=None, index=False, sep="\t")
+
+    # New functionality JS vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+    # use bedtools getfasta to extract sequences
+    cmd_tmnt = [
+        "bedtools",
+        "getfasta",
+        "-fi",
+        args.genome_fl,
+        "-bed",
+        args.peaks_fl,
+        "-fo",
+        args.output_tmnt_fasta,
+    ]
+    subprocess.run(cmd_tmnt)
+
+    cmd_ctrl = [
+        "bedtools",
+        "getfasta",
+        "-fi",
+        args.genome_fl,
+        "-bed",
+        args.output_ctrl_bed,
+        "-fo",
+        args.output_ctrl_fasta,
+    ]
+    subprocess.run(cmd_ctrl)
+    # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     write_fasta(args.output_tmnt_fasta, peak_seq)
 

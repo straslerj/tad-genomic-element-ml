@@ -7,13 +7,18 @@ import sys
 import intervaltree
 import pandas as pd
 
+
 def read_narrowpeak(flname):
-    df = pd.read_csv(flname, delim_whitespace=True,
-                     header=None,
-                     usecols=[0, 1, 2, 9],
-                     names=["chromosome", "start", "end", "summit_offset"])
+    df = pd.read_csv(
+        flname,
+        delim_whitespace=True,
+        header=None,
+        usecols=[0, 1, 2],
+        names=["chromosome", "start", "end"],
+    )
 
     return df
+
 
 def read_fasta(flname):
     sequences = dict()
@@ -34,12 +39,15 @@ def read_fasta(flname):
 
     return sequences
 
+
 def sample_control_windows(peak_df, window_size, chrom_sizes):
     # we want to ensure that the controls do not overlap
     # the peaks
-    exclusions = { chrom : intervaltree.IntervalTree() for chrom in set(peak_df["chromosome"]) }
+    exclusions = {
+        chrom: intervaltree.IntervalTree() for chrom in set(peak_df["chromosome"])
+    }
     for idx, row in peak_df.iterrows():
-        exclusions[row.chromosome][row.start:row.end + 1] = "peak"
+        exclusions[row.chromosome][row.start : row.end + 1] = "peak"
 
     # to use in sampling chromosomes proportionally to the treatment set
     chrom_universe = list(peak_df["chromosome"])
@@ -48,7 +56,7 @@ def sample_control_windows(peak_df, window_size, chrom_sizes):
     sampled_controls = []
     for idx, row in peak_df.iterrows():
         count = idx + 1
-        chrom = random.choice(chrom_universe)        
+        chrom = random.choice(chrom_universe)
         size = chrom_sizes[chrom]
         interval_start = 0
         interval_end = size - 1
@@ -61,7 +69,9 @@ def sample_control_windows(peak_df, window_size, chrom_sizes):
             # ensure that control sequence does not extend past interval boundary
 
             # convert to 1-indexed
-            control_start = random.randint(interval_start, interval_end - window_size) + 1
+            control_start = (
+                random.randint(interval_start, interval_end - window_size) + 1
+            )
             control_end = control_start + window_size
 
             n_attempts += 1
@@ -73,13 +83,17 @@ def sample_control_windows(peak_df, window_size, chrom_sizes):
 
                 # add sample to list of exclusions
                 exclusions[chrom][control_start:control_end] = "control"
-                
-                print("Found control sequence " + str(count + 1) + "/" + str(len(peak_df)))
+
+                print(
+                    "Found control sequence " + str(count + 1) + "/" + str(len(peak_df))
+                )
         if n_attempts == 1000:
             print("Unable to find satisfactory control.  Skipping.")
 
-    return pd.DataFrame.from_records(sampled_controls,
-                                     columns=["chromosome", "start", "end"])
+    return pd.DataFrame.from_records(
+        sampled_controls, columns=["chromosome", "start", "end"]
+    )
+
 
 def extract_sequences(genome_seqs, peak_df):
     sequences = dict()
@@ -91,6 +105,7 @@ def extract_sequences(genome_seqs, peak_df):
 
     return sequences
 
+
 def write_fasta(flname, seqs):
     with open(flname, "wt") as fl:
         for name, seq in seqs.items():
@@ -100,47 +115,49 @@ def write_fasta(flname, seqs):
             fl.write(seq)
             fl.write("\n")
 
+
 def main():
     parser = argparse.ArgumentParser()
-    
-    parser.add_argument("--peaks-fl",
-                        required=True,
-                        type=str,
-                        help="NarrowPeak file from MACS")
 
-    parser.add_argument("--genome-fl",
-                        required=True,
-                        type=str,
-                        help="Genome FASTA file")
+    parser.add_argument(
+        "--peaks-fl", required=True, type=str, help="NarrowPeak file from MACS"
+    )
 
-    parser.add_argument("--window-size",
-                        required=True,
-                        type=int,
-                        help="Window size to use for sequences")
+    parser.add_argument(
+        "--genome-fl", required=True, type=str, help="Genome FASTA file"
+    )
 
-    parser.add_argument("--output-tmnt-bed",
-                        required=True,
-                        type=str,
-                        help="Resulting treatment windows")
+    parser.add_argument(
+        "--window-size",
+        required=True,
+        type=int,
+        help="Window size to use for sequences",
+    )
 
-    parser.add_argument("--output-tmnt-fasta",
-                        required=True,
-                        type=str,
-                        help="Resulting treatment sequences")
+    parser.add_argument(
+        "--output-tmnt-bed", required=True, type=str, help="Resulting treatment windows"
+    )
 
-    parser.add_argument("--output-ctrl-bed",
-                        required=True,
-                        type=str,
-                        help="Resulting control windows")
+    parser.add_argument(
+        "--output-tmnt-fasta",
+        required=True,
+        type=str,
+        help="Resulting treatment sequences",
+    )
 
-    parser.add_argument("--output-ctrl-fasta",
-                        required=True,
-                        type=str,
-                        help="Resulting control sequences")
+    parser.add_argument(
+        "--output-ctrl-bed", required=True, type=str, help="Resulting control windows"
+    )
 
-    parser.add_argument("--selected-chromosomes",
-                        nargs="+")
-    
+    parser.add_argument(
+        "--output-ctrl-fasta",
+        required=True,
+        type=str,
+        help="Resulting control sequences",
+    )
+
+    parser.add_argument("--selected-chromosomes", nargs="+")
+
     args = parser.parse_args()
 
     is_window_even = args.window_size % 2 == 0
@@ -151,44 +168,33 @@ def main():
     peak_df = read_narrowpeak(args.peaks_fl)
 
     if args.selected_chromosomes:
-        query = " or ".join(map(lambda s: "chromosome == '{}'".format(s), args.selected_chromosomes))
+        query = " or ".join(
+            map(lambda s: "chromosome == '{}'".format(s), args.selected_chromosomes)
+        )
         print(query)
         peak_df = peak_df.query(query).copy()
 
-    # extract windows centered on peak summits
-    peak_df["summit_pos"] = peak_df["start"] + peak_df["summit_offset"]
-    peak_df["start"] = peak_df["summit_pos"] - args.window_size // 2
-    peak_df["end"] = peak_df["summit_pos"] + args.window_size // 2
-
     genome_seq = read_fasta(args.genome_fl)
-    genome_seq = { name : seq for name, seq in genome_seq.items() if len(args.selected_chromosomes) == 0 or name in args.selected_chromosomes }
-    chrom_sizes = { name : len(seq) for name, seq in genome_seq.items() }
+    genome_seq = {
+        name: seq
+        for name, seq in genome_seq.items()
+        if len(args.selected_chromosomes) == 0 or name in args.selected_chromosomes
+    }
+    chrom_sizes = {name: len(seq) for name, seq in genome_seq.items()}
 
-    control_df = sample_control_windows(peak_df,
-                                        args.window_size,
-                                        chrom_sizes)
+    control_df = sample_control_windows(peak_df, args.window_size, chrom_sizes)
 
-    peak_seq = extract_sequences(genome_seq,
-                                 peak_df)
+    peak_seq = extract_sequences(genome_seq, peak_df)
 
-    control_seq = extract_sequences(genome_seq,
-                                    control_df)
+    control_seq = extract_sequences(genome_seq, control_df)
 
-    control_df.to_csv(args.output_ctrl_bed,
-                      header=None,
-                      index=False,
-                      sep="\t")
+    control_df.to_csv(args.output_ctrl_bed, header=None, index=False, sep="\t")
 
-    peak_df.to_csv(args.output_tmnt_bed,
-                   header=None,
-                   index=False,
-                   sep="\t")
-    
-    write_fasta(args.output_tmnt_fasta,
-                peak_seq)
+    peak_df.to_csv(args.output_tmnt_bed, header=None, index=False, sep="\t")
 
-    write_fasta(args.output_ctrl_fasta,
-                control_seq)
+    write_fasta(args.output_tmnt_fasta, peak_seq)
+
+    write_fasta(args.output_ctrl_fasta, control_seq)
 
 
 if __name__ == "__main__":
