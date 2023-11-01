@@ -56,6 +56,27 @@ def get_fasta_from_bed(shuffled_bed_file, genome_fl, fasta_output, bedtools_path
     subprocess.run(cmd, check=True, stderr=subprocess.PIPE)
 
 
+# def read_fasta(flname):
+#     sequences = dict()
+#     with open(flname) as fl:
+#         seq_name = None
+#         seq = ""
+#         for ln in fl:
+#             if ln.startswith(">"):
+#                 if seq_name != None:
+#                     sequences[seq_name] = seq
+#                 seq_name = ln[1:].strip().split()[0]
+#                 print(seq)
+#                 seq = ""
+#             else:
+#                 seq += ln.strip()
+
+#         if seq_name != None:
+#             sequences[seq_name] = seq
+
+#     return sequences
+
+
 def read_fasta(flname):
     sequences = dict()
     with open(flname) as fl:
@@ -65,14 +86,15 @@ def read_fasta(flname):
             if ln.startswith(">"):
                 if seq_name != None:
                     sequences[seq_name] = seq
-                seq_name = ln[1:].strip().split()[0]
+                seq_name = ln.strip().split(":")[0][1:]
+
+                # print(seq_name)
                 seq = ""
             else:
+                # print(ln.strip())
                 seq += ln.strip()
 
-        if seq_name != None:
-            sequences[seq_name] = seq
-
+    print(sequences.keys())
     return sequences
 
 
@@ -89,6 +111,7 @@ def sample_control_windows(peak_df, window_size, chrom_sizes):
     chrom_universe = list(peak_df["chromosome"])
 
     # Keep track of progress
+    print(chrom_sizes)
     sampled_controls = []
     for idx, row in peak_df.iterrows():
         count = idx + 1
@@ -276,14 +299,14 @@ def main():
 
     # New functionality JS vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
     print(args.peaks_fl, args.genome_fl)
-    print("Shuffling bed file...")
-    shuffled = shuffle_bed(args.peaks_fl, args.bed_genome_fl)  # shuffles BED file
-    print("Shuffled bed file complete.")
+    # print("Shuffling bed file...")
+    # shuffled = shuffle_bed(args.peaks_fl, args.bed_genome_fl)  # shuffles BED file
+    # print("Shuffled bed file complete.")
     lengths = get_fasta_length(
         args.genome_fl
     )  # gets lengths of sequences in the FASTA file
-    args.peaks_fl = shuffled  # use shuffled BED
-    # args.peak_fl = "input/tad_classification.shuffled.bed"
+    # args.peaks_fl = shuffled  # use shuffled BED
+    args.peak_fl = "input/tad_classification.shuffled.bed"
     # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     peak_df = read_narrowpeak(args.peaks_fl)
@@ -296,6 +319,8 @@ def main():
         peak_df = peak_df.query(query).copy()
 
     genome_seq = read_fasta(args.genome_fl)
+    if len(genome_seq) > 1:
+        print("genome seq seems right")
     genome_seq = {
         name: seq
         for name, seq in genome_seq.items()

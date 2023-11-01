@@ -13,27 +13,47 @@ CHROMOSOMES = ["2L", "2R", "3L", "3R", "X"]
 
 rule all:
     input:
-        tmnt_bed=expand("data/sequences/{exp}/tmnt.bed", exp=experiment_names),
+        #tmnt_bed=expand("data/sequences/{exp}/tmnt.bed", exp=experiment_names),
         tmnt_fa=expand("data/sequences/{exp}/tmnt.fa", exp=experiment_names),
         ctrl_bed=expand("data/sequences/{exp}/ctrl.bed", exp=experiment_names),
-        ctrl_fa=expand("data/sequences/{exp}/ctrl.fa", exp=experiment_names)
+        ctrl_fa=expand("data/sequences/{exp}/ctrl.fa", exp=experiment_names),
+        roc_curve="data/figures/roc_curve.png"
 
-rule extract_sequences:
+        #ctrl_bed="data/sequences/{exp}/ctrl.bed",
+        #ctrl_fa="data/sequences/{exp}/ctrl.fa"
+
+rule extract_positives:
     input:
         peaks="input/tad_classification.bed",
-        genome="input/dmel-all-chromosome-r6.54.fasta",
-        bed_genome="input/bed.genome"
-    params:
-        selected_chrom=" ".join(CHROMOSOMES)
+        genome="input/dmel-all-chromosome-r6.54.fasta"
     output:
-        tmnt_bed="data/sequences/{exp}/tmnt.bed",
-        tmnt_fa="data/sequences/{exp}/tmnt.fa",
-        ctrl_bed="data/sequences/{exp}/ctrl.bed",
+        tmnt_fa="data/sequences/{exp}/tmnt.fa"
+    threads:
+        1
+    shell:
+        "bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.tmnt_fa}"
+
+rule shuffle_positives:
+    input:
+        peaks="input/tad_classification.bed",
+        genome_size="input/genome.size"
+    output:
+        ctrl_bed="data/sequences/{exp}/ctrl.bed"
+    threads:
+        1
+    shell:
+        "bedtools shuffle -g {input.genome_size} -i {input.peaks} > {output.ctrl_bed}"
+
+rule extract_controls:
+    input:
+        peaks="data/sequences/{exp}/ctrl.bed",
+        genome="input/dmel-all-chromosome-r6.54.fasta"
+    output:
         ctrl_fa="data/sequences/{exp}/ctrl.fa"
     threads:
         1
     shell:
-        "scripts/modified_sample_controls --peaks-fl {input.peaks} --genome-fl {input.genome} --output-tmnt-bed {output.tmnt_bed} --output-tmnt-fasta {output.tmnt_fa} --output-ctrl-bed {output.ctrl_bed} --output-ctrl-fasta {output.ctrl_fa} --selected-chromosomes {params.selected_chrom} --window-size 501 --bed-genome-fl {input.bed_genome}"
+        "bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.ctrl_fa}"
 
 rule evaluate_models:
     input:

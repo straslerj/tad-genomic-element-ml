@@ -22,11 +22,11 @@ def get_chromosomes(seqs):
 
     chrom_start_end
 
-    e.g., chr2L_34345_50123
+    e.g., chr2L:34345_50123
     """
     chromosomes = []
     for name in seqs:
-        cols = name.split("_")
+        cols = name.split(":")
         chromosomes.append(cols[0])
 
     return chromosomes
