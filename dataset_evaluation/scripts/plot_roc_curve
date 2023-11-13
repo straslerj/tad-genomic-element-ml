@@ -9,28 +9,34 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import roc_curve
 from sklearn.metrics import roc_auc_score
 
+
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--result-npzs",
-                        type=str,
-                        nargs="+",
-                        help="Npz files from training and evaluating models")
+    parser.add_argument(
+        "--result-npzs",
+        type=str,
+        nargs="+",
+        help="Npz files from training and evaluating models",
+    )
 
-    parser.add_argument("--experiment-names",
-                        type=str,
-                        nargs="+",
-                        help="Provide names for plot labels [must match length of result-npzs]")
+    parser.add_argument(
+        "--experiment-names",
+        type=str,
+        nargs="+",
+        help="Provide names for plot labels [must match length of result-npzs]",
+    )
 
-    parser.add_argument("--plot-fl",
-                        type=str,
-                        required=True,
-                        help="Filename for resulting ROC curve")
-    
+    parser.add_argument(
+        "--plot-fl", type=str, required=True, help="Filename for resulting ROC curve"
+    )
+
     args = parser.parse_args()
 
     if len(args.experiment_names) != len(args.result_npzs):
-        print("You must provide the same number of experiment names as result npz files")
+        print(
+            "You must provide the same number of experiment names as result npz files"
+        )
         sys.exit(1)
 
     fig = plt.gcf()
@@ -50,7 +56,6 @@ def main():
     plt.legend(fontsize=12)
     plt.tight_layout()
     plt.savefig(args.plot_fl)
-
 
 
 if __name__ == "__main__":

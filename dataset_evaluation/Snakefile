@@ -1,8 +1,8 @@
 # these two have to be in the same order
-peaks = ["tad"]
+peaks = ["251", "501", "1001"]
 
 # determines used in the ROC curve plot
-experiment_names = ["tad"]
+experiment_names = ["251", "501", "1001"]
 
 N_ESTIMATORS = 48
 REG_WEIGHT = 0.1
@@ -24,25 +24,25 @@ rule all:
 
 rule extract_positives:
     input:
-        peaks="input/tad_classification.bed",
+        peaks="input/{exp}_tad_classification.bed",
         genome="input/dmel-all-chromosome-r6.54.fasta"
     output:
         tmnt_fa="data/sequences/{exp}/tmnt.fa"
     threads:
         1
     shell:
-        "bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.tmnt_fa}"
+        "./bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.tmnt_fa}"
 
 rule shuffle_positives:
     input:
-        peaks="input/tad_classification.bed",
+        peaks="input/{exp}_tad_classification.bed",
         genome_size="input/genome.size"
     output:
         ctrl_bed="data/sequences/{exp}/ctrl.bed"
     threads:
         1
     shell:
-        "bedtools shuffle -g {input.genome_size} -i {input.peaks} > {output.ctrl_bed}"
+        "./bedtools shuffle -g {input.genome_size} -i {input.peaks} > {output.ctrl_bed}"
 
 rule extract_controls:
     input:
@@ -53,7 +53,7 @@ rule extract_controls:
     threads:
         1
     shell:
-        "bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.ctrl_fa}"
+        "./bedtools getfasta -fi {input.genome} -bed {input.peaks} > {output.ctrl_fa}"
 
 rule evaluate_models:
     input:

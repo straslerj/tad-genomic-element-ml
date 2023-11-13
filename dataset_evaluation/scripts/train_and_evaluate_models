@@ -75,12 +75,12 @@ def filter_by_chromosome(seqs, selected_chrom):
 def write_bed(flname, seqs):
     with open(flname, "w") as fl:
         for seq_name in seqs:
-            cols = seq_name.split("_")
+            cols = seq_name.split(":")
             fl.write(cols[0])
             fl.write("\t")
-            fl.write(cols[1])
+            fl.write(cols[1].split("-")[0])
             fl.write("\t")
-            fl.write(cols[2])
+            fl.write(cols[1].split("-")[1])
             fl.write("\t")
             fl.write(seq_name)
             fl.write("\n")
@@ -175,8 +175,7 @@ def main():
     # we get the same result either way.
     print("Vectorizing")
     vec = CountVectorizer(ngram_range=(6, 8), analyzer="char")
-    print(f"{all_seq.values()=}")
-    print(f"{args.tmnt_fasta=}")
+    # print(f"{all_seq.values()=}")
 
     X = vec.fit_transform(all_seq.values())
 
@@ -189,7 +188,7 @@ def main():
     # Goal is to compensate for variance from random
     # weight initialization of SGD classifier
     ensemble = BaggingClassifier(
-        sgd, n_estimators=args.n_estimators, bootstrap=False, n_jobs=args.n_jobs
+        sgd, n_estimators=args.n_estimators, bootstrap=False, n_jobs=1
     )
     logo = LeaveOneGroupOut()
     pos_seqs = dict()
