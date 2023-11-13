@@ -159,7 +159,9 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-tad-genomic-element-ml/dataset_evaluation/.snakemake/
-tad-genomic-element-ml/dataset_evaluation/data/model_predictions/
-tad-genomic-element-ml/dataset_evaluation/data/sequences/
-tad-genomic-element-ml/dataset_evaluation/input/
+dataset_evaluation/.snakemake/
+dataset_evaluation/data/model_predictions/
+dataset_evaluation/data/sequences/
+dataset_evaluation/input/
+bedtools
+dataset_evaluation/.snakemake/
