@@ -7,6 +7,7 @@ import sys
 import numpy as np
 
 from sklearn.ensemble import BaggingClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import SGDClassifier
 from sklearn.metrics import accuracy_score
@@ -162,10 +163,12 @@ def main():
     all_seq.update(ctrl_seq)
 
     labels = np.zeros(len(all_seq))
+    # print(tmnt_seq)
     labels[: len(tmnt_seq)] = 1.0
 
     encoder = LabelEncoder()
     chromosomes = get_chromosomes(all_seq)
+    # print(f"{chromosomes=}")
     groups = encoder.fit_transform(chromosomes)
 
     # Okay, so in theory we should do the vectorization
@@ -183,6 +186,7 @@ def main():
     all_pred_y = []
     predicted_probs = []
 
+    # SGD!
     sgd = SGDClassifier(loss="log_loss", alpha=args.reg_weight)
     # Bootstrapping didn't help with reducing variance or accuracy
     # Goal is to compensate for variance from random
@@ -190,10 +194,16 @@ def main():
     ensemble = BaggingClassifier(
         sgd, n_estimators=args.n_estimators, bootstrap=False, n_jobs=1
     )
+
+    # RF!
+    # rf = RandomForestClassifier(n_estimators=args.n_estimators, random_state=42)
+    # ensemble = BaggingClassifier(rf, n_estimators=args.n_estimators, n_jobs=1)
     logo = LeaveOneGroupOut()
     pos_seqs = dict()
     neg_seqs = dict()
     print("Model training and evaluation")
+    # print(f"{X}")
+    # print(labels)
     for train_idx, test_idx in logo.split(X, labels, groups=groups):
         train_X = X[train_idx]
         test_X = X[test_idx]
@@ -203,6 +213,9 @@ def main():
 
         target_chrom = chromosomes[test_idx[0]]
         _, target_seqs = filter_by_chromosome(tmnt_seq, [target_chrom])
+
+        # print(f"{np.unique(train_X)=}")
+        # print(f"{np.unique(train_y)=}")
 
         ensemble.fit(train_X, train_y)
 

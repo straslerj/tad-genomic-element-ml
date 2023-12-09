@@ -1,15 +1,19 @@
 # these two have to be in the same order
-peaks = ["251", "501", "1001"]
+# peaks = ["251", "501", "1001"]
+peaks = ["tad"]
 
 # determines used in the ROC curve plot
-experiment_names = ["251", "501", "1001"]
+# experiment_names = ["251", "501", "1001"]
+experiment_names = ["tad"]
 
 N_ESTIMATORS = 48
 REG_WEIGHT = 0.1
 
 # The heterochromatin and other scaffolds are pretty small
 # so we won't use them
-CHROMOSOMES = ["2L", "2R", "3L", "3R", "X"]
+CHROMOSOMES = ["chr2L", "chr2R", "chr3L", "chr3R", "chrX"]
+# CHROMOSOMES = ["2L", "2R", "3L", "3R", "X"]
+
 
 rule all:
     input:
@@ -24,8 +28,9 @@ rule all:
 
 rule extract_positives:
     input:
-        peaks="input/{exp}_tad_classification.bed",
-        genome="input/dmel-all-chromosome-r6.54.fasta"
+        peaks="input/{exp}_classification.bed",
+        genome="input/dm3.fa"
+        # genome="input/dmel-all-chromosome-r6.54.fasta"
     output:
         tmnt_fa="data/sequences/{exp}/tmnt.fa"
     threads:
@@ -35,7 +40,7 @@ rule extract_positives:
 
 rule shuffle_positives:
     input:
-        peaks="input/{exp}_tad_classification.bed",
+        peaks="input/{exp}_classification.bed",
         genome_size="input/genome.size"
     output:
         ctrl_bed="data/sequences/{exp}/ctrl.bed"
@@ -47,7 +52,8 @@ rule shuffle_positives:
 rule extract_controls:
     input:
         peaks="data/sequences/{exp}/ctrl.bed",
-        genome="input/dmel-all-chromosome-r6.54.fasta"
+        genome="input/dm3.fa"
+        # genome="input/dmel-all-chromosome-r6.54.fasta"
     output:
         ctrl_fa="data/sequences/{exp}/ctrl.fa"
     threads:
@@ -86,11 +92,9 @@ rule plot_roc_curve:
         
 rule run_experiments:
     input:
-        treatment_bed_fls=expand("data/sequences/{peak_exp}/tmnt.bed",
-                                 peak_exp=peaks),
-        pred_fls=expand("data/model_predictions/{peak_exp}.npz",
-                        peak_exp=peaks),
+        # treatment_bed_fls=expand("data/sequences/{peak_exp}/tmnt.bed",
+        #                          peak_exp=peaks),
+        # pred_fls=expand("data/model_predictions/{peak_exp}.npz",
+        #                 peak_exp=peaks),
         roc="data/figures/roc_curve.png"
-
-
 
